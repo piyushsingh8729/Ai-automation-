@@ -1,0 +1,424 @@
+{
+  "name": "mascort gen 1 pj",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        544
+      ],
+      "id": "e20588fa-c5aa-4bd1-bee4-6a66e503ac39",
+      "name": "WhatsApp Trigger",
+      "webhookId": "c428be42-76ea-45b6-87d8-d3ef5ed0063b",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "04PE16reBiUmv7Pn",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "mediaUrlGet",
+        "mediaGetId": "={{ $json.messages[0].image.id }}"
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        240,
+        528
+      ],
+      "id": "785a11d9-8ff9-426c-a50e-61656d55c504",
+      "name": "Download media",
+      "webhookId": "858fd7f9-b733-480b-851e-296043bab835",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "W8rknwzDWP5Ve2tV",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "021aad70-de11-4387-844e-7e7dfd3b1044",
+              "name": "image",
+              "type": "string",
+              "value": "={{ $json.candidates[0].content.parts.find(part => part.inlineData).inlineData.data }}"
+            },
+            {
+              "id": "62877ef7-2057-4d35-a44b-1d58fa1f1769",
+              "name": "mimeType",
+              "type": "string",
+              "value": "={{ $json.candidates[0].content.parts.find(part => part.inlineData).inlineData.mimeType }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0059580-5122-4a3d-90ac-7d7a534fc3f6",
+      "name": "Get Image Contents",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1888,
+        496
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "image",
+        "options": {
+          "mimeType": "={{ $json.mimeType }}"
+        }
+      },
+      "id": "e9d69217-4cc1-4b2e-8e06-3cb033d55d17",
+      "name": "Convert to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        2080,
+        496
+      ],
+      "typeVersion": 1.1,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "ba567da1-8f10-42a5-8191-d190732c1494",
+      "name": "Merge1",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        880,
+        496
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "include": "=allFields",
+        "options": {}
+      },
+      "id": "cb99ba3d-26e8-45d1-b6f3-4f310d3fc40f",
+      "name": "Aggregate1",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1312,
+        496
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"The red hero character stands confidently on stage with arms folded and a serious expression. Character 1 stands with their back pressed against the red hero’s back, both at the same height and equal distance. Their backs and shoulders are touching, as if they are supporting each other. Character 1’s arms are either partially folded or relaxed. Both characters must be fully visible at the front — not one in front and the other hidden behind. Retain the exact art style, lighting, and perspective of the original character image\"\n        },\n        {\n          \"inline_data\": {\n            \"mime_type\": \"image/png\",\n            \"data\": \"{{ $json.data[0].data }}\"\n          }\n        },\n        {\n          \"inline_data\": {\n            \"mime_type\": \"image/png\",\n            \"data\": \"{{ $json.data[1].data }}\"\n          }\n        },\n        {\n          \"inline_data\": {\n            \"mime_type\": \"image/png\",\n            \"data\": \"{{ $json.data[2].data }}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"generationConfig\": {\n    \"responseModalities\": [\n      \"TEXT\",\n      \"IMAGE\"\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "a9f891f9-3575-47d3-b766-c2790dbfaa94",
+      "name": "Gemini Image Compose",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1648,
+        496
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "oUFn5BXixMQzfCTl",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "id": "a0eadd0c-8652-42c1-a9fb-47f0c1b026c4",
+      "name": "Extract from File2",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1088,
+        496
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "14tESesyC2-Iezcbjdx_j1aDJ64bn19S0",
+          "mode": "list",
+          "cachedResultName": "—Pngtree—a minimalist stage with a_17981333.png",
+          "cachedResultUrl": "https://drive.google.com/file/d/14tESesyC2-Iezcbjdx_j1aDJ64bn19S0/view?usp=drivesdk"
+        },
+        "options": {
+          "binaryPropertyName": "data",
+          "fileName": "text3"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        208,
+        688
+      ],
+      "id": "21235394-3a84-4686-91af-a1ff50521a82",
+      "name": "sofa",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "lJB6OWTzowfVfA4p",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1KrcFDv2J_DC_9dC_RP18e9rMhiVSoiwk",
+          "mode": "list",
+          "cachedResultName": "pic1.jpg",
+          "cachedResultUrl": "https://drive.google.com/file/d/1KrcFDv2J_DC_9dC_RP18e9rMhiVSoiwk/view?usp=drivesdk"
+        },
+        "options": {
+          "binaryPropertyName": "data",
+          "fileName": "text"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        208,
+        368
+      ],
+      "id": "a6cb0e05-7288-4bc8-86cd-7647f61a5213",
+      "name": "character",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "lJB6OWTzowfVfA4p",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "808191762370093",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}",
+        "messageType": "image",
+        "mediaPath": "useMedian8n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        496
+      ],
+      "id": "bce5bf18-c8c4-4b27-a3df-784fe5c26259",
+      "name": "Send message4",
+      "webhookId": "e7798fd7-b601-4f2a-b871-0cc7f1cc251e",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "W8rknwzDWP5Ve2tV",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization ",
+              "value": "Bearer EAAVkg1wete4BPWge1Ja855lLYSD97zZB4Vc5EMWap49d9ZASC0Q4fpVYPkpZAA64EZByPF38EmLSyoJhHHU7REAn6HsHrJrQkOHx45eVHeHCqEK1kCZB5UNRuEKwZAVFdhJRbfn79VUq6OOBqkgkPGo6FnIGJf5zDFAQJOHYTZBTR2ViEWnFAm886i8TgZBqxISpoooHHfkzCUGIj78I4AjfOV0kdMbkWhtwO9YNTVFQNvjXkb7emlMtDslzCwZDZD"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        416,
+        528
+      ],
+      "id": "231e204c-45b0-47c5-9859-57a3766a7a0d",
+      "name": "HTTP Request5"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download media",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "character",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "sofa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download media": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image Contents": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Send message4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Gemini Image Compose",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Image Compose": {
+      "main": [
+        [
+          {
+            "node": "Get Image Contents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File2": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sofa": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "character": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request5": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6e5f9c30-950d-4ef6-bf55-335759d279eb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36d9ae84a72d08531f0efdc8013b1e8d0435664f3bb9efa747948048236d8051"
+  },
+  "id": "IbjSPI8nSBfu3Qbe",
+  "tags": []
+}

@@ -1,0 +1,306 @@
+{
+  "name": "news telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2f501342-b7f4-4f3d-bf5d-731b83d42478",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://gnews.io/api/v4/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "Ai"
+            },
+            {
+              "name": "lang",
+              "value": "en"
+            },
+            {
+              "name": "apikey",
+              "value": "b2180737ec824749fa7715a62d3cc537"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "6ede7081-3488-483f-b55d-59350bd0e567",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "url": "https://gnews.io/api/v4/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "law"
+            },
+            {
+              "name": "lang",
+              "value": "en"
+            },
+            {
+              "name": "apikey",
+              "value": "b2180737ec824749fa7715a62d3cc537"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        176
+      ],
+      "id": "21204c67-8ae0-45b2-9581-fb87e8ee0b0d",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        624,
+        112
+      ],
+      "id": "46d7fca5-1eeb-4f63-85ef-e4af92a2b0c4",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "92e69380-713a-4853-8232-6442650a9cbb",
+              "name": "articles",
+              "value": "={{ $json.articles }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        -48
+      ],
+      "id": "f8b0a566-7421-4bd4-8a13-dd036a4b2d50",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "92e69380-713a-4853-8232-6442650a9cbb",
+              "name": "articles",
+              "value": "={{ $json.articles }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        384,
+        208
+      ],
+      "id": "19491137-4f11-4a5e-a790-63e169a7031f",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=- Select Top Articles\nFrom {{ $json.articles }}, choose the 15 most relevant articles focused on AI technology advancements, tools, research, and applications.\n- ✍️ Summarize Clearly\nFor each selected article, write a 1–2 sentence summary in clear, professional, and readable language. Focus on the core insight or takeaway.\n- 🔗 Include Links\nAfter each summary, append the article’s URL so readers can explore further.\n- 📅 Add the Date\nBegin the entire summary with today’s date using:\n{{ $now.format('yyyy/MM/dd') }}\n\n",
+        "options": {
+          "systemMessage": "- 📄 Output Format\nReturn only the plain text summary. No extra formatting, explanations, or markdown. Keep the total response under 2000 characters."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        976,
+        96
+      ],
+      "id": "c9ac7382-f822-4256-927c-9cec6c8250ae",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        864,
+        304
+      ],
+      "id": "d38dd08a-88d3-4556-830e-58dbfd61e0fb",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "oUFn5BXixMQzfCTl",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1102005535",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        112
+      ],
+      "id": "419fb809-f00a-475e-b412-db5576b7a11a",
+      "name": "Send a text message",
+      "webhookId": "9c91bc35-0986-4d58-82d4-4b5ff2424148",
+      "credentials": {
+        "telegramApi": {
+          "id": "uARvt5iEhK7e8ZGl",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "20aeb98b-1bbc-4423-952a-035d69883d79",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36d9ae84a72d08531f0efdc8013b1e8d0435664f3bb9efa747948048236d8051"
+  },
+  "id": "uUnJtS9GFa2bBgN0",
+  "tags": []
+}

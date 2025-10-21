@@ -1,0 +1,1638 @@
+{
+  "name": "whatsaap ai with diffent calender",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1536,
+        1216
+      ],
+      "id": "5855355b-b303-4f92-a956-2366d9062ddf",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "schedule",
+        "returnAll": true,
+        "matchType": "allFilters"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1360,
+        1216
+      ],
+      "id": "e648d790-dc55-4ec5-aa2a-8d9f50dae1c1",
+      "name": "Get many rows1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "DAtZ8AUnO1FZkTwU",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "808191762370093",
+        "recipientPhoneNumber": "={{ $('Code3').item.json.recipiant }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        944,
+        864
+      ],
+      "id": "416b211a-c546-4ee4-9adc-8f7db2b2cbe3",
+      "name": "Send message1",
+      "webhookId": "e7798fd7-b601-4f2a-b871-0cc7f1cc251e",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "W8rknwzDWP5Ve2tV",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        400
+      ],
+      "id": "59284fb9-b0d8-496a-a68f-e4f095c17dc6",
+      "name": "WhatsApp Trigger1",
+      "webhookId": "9d04eef8-64ed-48d7-8d56-329fe68b7b0e"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\n{{ $items(\"WhatsApp Trigger1\").map(item => item.json.messages[0].text.body) }}\n\n",
+        "options": {
+          "systemMessage": "=ROLE\n\nYou are a friendly AI assistant.\nYou are currently chatting with a user on WhatsApp.\n\nRULES\n\nWhen the user sends a new message, check if they shared any important information that should be saved in memory** for later.\nIf yes, use the Save Memory tool to save it.\nDo NOT tell the user that you are saving anything.\nJust keep the conversation going as usual.\n\nAdditionally:\nIf the message contains a time expression (like \"6pm\", \"8 am\", \"tomorrow at 9:30\", \"8 June 5 pm\") that indicates a reminder:\n\nSave it in Supabase with type = reminder.\n\nOtherwise, set type = chat.\n\nUse current date dynamically for all reminders using:\n{{ $now.format('yyyy/MM/dd') }} (this will pick IST automatically if n8n timezone is set to Asia/Kolkata).\n\nInclude the scheduled time in HH:mm:ss format (so it works with Supabase time type).\n\nInclude:\n\nreminder_time_10 → 10 minutes before exact time (HH:mm:ss).\n\nreminder_time_30 → 30 minutes before exact time (HH:mm:ss).\n\nreminder_time_exact → same as scheduled time.\n\n---\n\nExample for reference:\n\n```js\nconst rawMessage = items['Whatsapp_Trigger'].message;\n\n// --- DATE PARSING ---\nlet date;\n\n// Match YYYY/MM/DD or YYYY-MM-DD\nconst fullDateMatch = rawMessage.match(/(\\d{4}[\\/-]\\d{2}[\\/-]\\d{2})/);\n\n// Match \"8 June\", \"08 Jun\", etc.\nconst dayMonthMatch = rawMessage.match(/(\\d{1,2})\\s*(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)/i);\n\nif (fullDateMatch) {\n  date = fullDateMatch[1].replace(/-/g, \"/\");\n} else if (dayMonthMatch) {\n  const day = dayMonthMatch[1].padStart(2, \"0\");\n  const monthName = dayMonthMatch[2].toLowerCase();\n\n  const monthMap = {\n    january: \"01\", jan: \"01\",\n    february: \"02\", feb: \"02\",\n    march: \"03\", mar: \"03\",\n    april: \"04\", apr: \"04\",\n    may: \"05\",\n    june: \"06\", jun: \"06\",\n    july: \"07\", jul: \"07\",\n    august: \"08\", aug: \"08\",\n    september: \"09\", sept: \"09\", sep: \"09\",\n    october: \"10\", oct: \"10\",\n    november: \"11\", nov: \"11\",\n    december: \"12\", dec: \"12\"\n  };\n\n  const month = monthMap[monthName];\n  const year = new Date().getFullYear();\n  date = `${year}/${month}/${day}`;\n} else {\n  date = '{{ $now.format(\"yyyy/MM/dd\") }}'; // default today\n}\n\n// --- TIME PARSING ---\nconst timeMatch = rawMessage.match(/(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?/i);\n\nfunction parseTime(match) {\n  if (!match) return null;\n\n  let hour = parseInt(match[1], 10);\n  const minute = parseInt(match[2] || '00', 10);\n  const meridian = match[3]?.toLowerCase();\n\n  if (meridian === 'pm' && hour < 12) hour += 12;\n  if (meridian === 'am' && hour === 12) hour = 0;\n\n  const hh = String(hour).padStart(2, '0');\n  const mm = String(minute).padStart(2, '0');\n\n  return `${hh}:${mm}:00`; // HH:mm:ss\n}\n\nconst timeOnly = parseTime(timeMatch) || new Date().toTimeString().slice(0, 8);\nconst [h, m, s] = timeOnly.split(\":\");\nconst userTime = new Date();\nuserTime.setHours(h, m, s, 0);\n\n// Helper: always HH:mm:ss\nfunction formatTime(d) {\n  return d.toTimeString().slice(0, 8);\n}\n\n// Optional label\nconst labelMatch = rawMessage.match(/(?:set|schedule)\\s+a?\\s*(\\w+)/i);\nconst label = labelMatch ? labelMatch[1] : null;\n\nconst payload = {\n  type: isReminder ? \"reminder\" : \"chat\",   // always string\n  date: isReminder ? date : null,           // 👈 added date field\n  time: isReminder ? timeOnly : null,       \n  reminder_time_10: isReminder ? formatTime(new Date(userTime.getTime() - 10 * 60 * 1000)) : null,\n  reminder_time_30: isReminder ? formatTime(new Date(userTime.getTime() - 30 * 60 * 1000)) : null,\n  reminder_time_exact: isReminder ? timeOnly : null\n};\n\nif (label) payload.label = label;\n\n\nIf the message does not indicate a reminder:\n\nSave it as type = chat.\n\nSet time = null\n\nSet reminder_time_30 = null\n\nSet reminder_time_10 = null\n\nSet reminder_time_exact = null\n\nTools\n\nUse this tool to store any important facts** shared by the user. Summarize the information clearly and pass it to this tool.\n\nMemories\n\nThese are the last saved facts from the user (with date and time):\n\n{{ $json.chatmemory.toJsonString() }}\n\n!! IMPORTANT !!\nUse this stored info when replying.\nIf something is already saved, don't ask for it again.\nKeep your responses natural and friendly."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        400
+      ],
+      "id": "8ea818b9-07d9-4928-afc2-134713f2fe61",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "808191762370093",
+        "recipientPhoneNumber": "=\n{{ $items(\"WhatsApp Trigger1\")[0].json.contacts[0].wa_id }}\n",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        880,
+        400
+      ],
+      "id": "05bad0e4-d61c-48ff-ad94-a3b4d5d161a4",
+      "name": "Send message4",
+      "webhookId": "e7798fd7-b601-4f2a-b871-0cc7f1cc251e"
+    },
+    {
+      "parameters": {
+        "tableId": "schedule",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message",
+              "fieldValue": "=\n{{ $items(\"WhatsApp Trigger1\").map(item => item.json.messages[0].text.body) }}\n"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $items(\"WhatsApp Trigger1\").map(item => item.json.messages[0].from) }}\n"
+            },
+            {
+              "fieldId": "recipiant",
+              "fieldValue": "={{ $items(\"WhatsApp Trigger1\").map(item => item.json.contacts[0].wa_id) }}\n"
+            },
+            {
+              "fieldId": "date",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues3_Field_Value', ``, 'string') }}"
+            },
+            {
+              "fieldId": "reminder_time_10",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues4_Field_Value', ``, 'string') }}"
+            },
+            {
+              "fieldId": "reminder_time_30",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues5_Field_Value', ``, 'string') }}"
+            },
+            {
+              "fieldId": "reminder_time_exact",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues6_Field_Value', ``, 'string') }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fieldValues7_Field_Value', ``, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        480,
+        640
+      ],
+      "id": "c031371b-9035-4c93-b0d4-5fe3a6d41868",
+      "name": "Create a row in Supabase1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "DAtZ8AUnO1FZkTwU",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "schedule",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender",
+              "condition": "eq",
+              "keyValue": "={{ $json.contacts[0].wa_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        400
+      ],
+      "id": "6b85baff-ff60-4151-9c08-526cde5357e0",
+      "name": "Get many rows2",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "chatmemory",
+        "include": "specifiedFields",
+        "fieldsToInclude": "message,created_at",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        400
+      ],
+      "id": "685321d7-3257-4f87-9e98-c53120d96fa6",
+      "name": "Aggregate1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($input.all().length === 0) {\n  return [{\n    json: {\n      message: \"\",\n      created_at: new Date().toISOString()\n    }\n  }];\n}\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        400
+      ],
+      "id": "c66ed708-19af-484c-b197-17570b1a35ca",
+      "name": "Code2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ae07aa5c-af08-465d-8271-64886ee0a940",
+              "name": "=chatmemory",
+              "value": "={\n  messages: $json[\"message\"] ? [{ message: $json[\"message\"], created_at: $json[\"created_at\"] }] : []\n}\n",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        400
+      ],
+      "id": "ea6db8a2-7bfa-43a8-9a08-0b80d8117241",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a single, friendly WhatsApp reminder message for this event:\n{{ $('Get many rows1').all().slice(-1)[0].json.message }}\nMake it short, clear, and casual. Only return the message text, no lists or extra formatting.\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        464,
+        864
+      ],
+      "id": "9037dbb6-0e18-464d-a9fb-dcb1d5c224de",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        464,
+        1056
+      ],
+      "id": "820dde4a-20fb-401e-b079-c9e127499e20",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "oUFn5BXixMQzfCTl",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a single, friendly WhatsApp reminder message for this event:\n\"{{ $json.message }}\"\n\nMake it short, clear, and casual. Only return the message text, no lists or extra formatting.\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        1216
+      ],
+      "id": "27de97c5-4f4c-4bd5-9b4e-861c5509a121",
+      "name": "AI Agent2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        480,
+        1408
+      ],
+      "id": "d5a30596-6fd3-44b6-bd22-90df5994b102",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "oUFn5BXixMQzfCTl",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a single, friendly WhatsApp reminder message for this event:\n\"{{ $json.message }}\"\n\nMake it short, clear, and casual. Only return the message text, no lists or extra formatting.\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        1552
+      ],
+      "id": "40198796-3bcd-4bfe-893c-9cd7f03ec1b8",
+      "name": "AI Agent3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        480,
+        1760
+      ],
+      "id": "c8c05681-503f-4752-9d48-6aedda52e82c",
+      "name": "Google Gemini Chat Model3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "oUFn5BXixMQzfCTl",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "808191762370093",
+        "recipientPhoneNumber": "={{ $('Code5').item.json.recipiant }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        944,
+        1216
+      ],
+      "id": "f090cf82-cfc9-452d-b13b-b9ce039b79fb",
+      "name": "Send message",
+      "webhookId": "e7798fd7-b601-4f2a-b871-0cc7f1cc251e",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "W8rknwzDWP5Ve2tV",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "chatmemory",
+        "include": "specifiedFields",
+        "fieldsToInclude": "reminder_time_30, time,sender,recipiant,type,id, reminder_time_10, reminder_time_exact",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        864
+      ],
+      "id": "de59a397-a8db-439a-b4b0-1fb116fd9778",
+      "name": "Aggregate",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter items to keep only those with isReminderNow = true\nreturn $input.all().filter(item => item.json.isReminderNow);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        864
+      ],
+      "id": "7fd376cc-690f-461d-8e75-c328ca545af4",
+      "name": "Code3"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "chatmemory",
+        "include": "specifiedFields",
+        "fieldsToInclude": "reminder_time_10, time,sender,recipiant,type ,id,message, reminder_time_30, reminder_time_exact",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        1216
+      ],
+      "id": "9fbc6b12-5047-4b97-8828-21363ff9f5e0",
+      "name": "Aggregate2",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.first().json;\nconst output = [];\n\n// Current local time in HH:mm:ss (24-hour)\nconst now = new Date();\nconst timez = now.toTimeString().slice(0, 8); \nconsole.log(\"Current time:\", timez);\n\nif (inputData && Array.isArray(inputData.chatmemory)) {\n  inputData.chatmemory.forEach(entry => {\n    if (entry.reminder_time_10) {\n      const [remH, remM] = entry.reminder_time_10.split(\":\").map(Number);\n      const reminderMinutes = remH * 60 + remM;\n\n      const [nowH, nowM] = timez.split(\":\").map(Number);\n      const nowMinutes = nowH * 60 + nowM;\n\n      // Check within ±1 min\n      entry.isReminderNow = Math.abs(reminderMinutes - nowMinutes) <= 1;\n    } else {\n      entry.isReminderNow = false;\n    }\n\n    output.push({ json: entry });\n  });\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        1216
+      ],
+      "id": "dbd3dcf6-b411-4b80-ad48-282e2278cf09",
+      "name": "Code4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter items to keep only those with isReminderNow = true\nreturn $input.all().filter(item => item.json.isReminderNow);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        1216
+      ],
+      "id": "e49ed87d-6f99-4cbd-ac3e-79ce75af0bf8",
+      "name": "Code5"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "chatmemory",
+        "include": "specifiedFields",
+        "fieldsToInclude": " reminder_time_exact, time,sender,recipiant,type,message,id, reminder_time_30, reminder_time_10",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        1552
+      ],
+      "id": "5a3993dc-7c37-4b82-8bff-913b78d7fc46",
+      "name": "Aggregate3",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter items to keep only those with isReminderNow = true\nreturn $input.all().filter(item => item.json.isReminderNow);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        1552
+      ],
+      "id": "773b7161-faa3-4bc8-93de-0440d1b5a204",
+      "name": "Code7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.first().json;\nconst output = [];\n\n// Current local time in HH:mm:ss (24-hour)\nconst now = new Date();\nconst timez = now.toTimeString().slice(0, 8); \nconsole.log(\"Current time:\", timez);\n\nif (inputData && Array.isArray(inputData.chatmemory)) {\n  inputData.chatmemory.forEach(entry => {\n    if (entry.reminder_time_30) {\n      const [remH, remM] = entry.reminder_time_30.split(\":\").map(Number);\n      const reminderMinutes = remH * 60 + remM;\n\n      const [nowH, nowM] = timez.split(\":\").map(Number);\n      const nowMinutes = nowH * 60 + nowM;\n\n      // Check within ±1 min\n      entry.isReminderNow = Math.abs(reminderMinutes - nowMinutes) <= 1;\n    } else {\n      entry.isReminderNow = false;\n    }\n\n    output.push({ json: entry });\n  });\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        864
+      ],
+      "id": "5ed962c2-3c31-414d-a74e-2b2c8b6b95c0",
+      "name": "Code8"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9ef19f56-21d9-4ab0-b25c-5f92e30129a4",
+              "leftValue": "=\n{{ $json.date }}",
+              "rightValue": "={{ $now.format(\"yyyy-MM-dd\") }}\n\n",
+              "operator": {
+                "type": "dateTime",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -800,
+        1216
+      ],
+      "id": "ce5f64c4-d720-4590-b722-f84b97d48833",
+      "name": "Filter1"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "808191762370093",
+        "recipientPhoneNumber": "={{ $('Code7').item.json.recipiant }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        928,
+        1552
+      ],
+      "id": "fe8a0c7e-5e7c-4bca-9374-e85d014579c5",
+      "name": "Send message3",
+      "webhookId": "e7798fd7-b601-4f2a-b871-0cc7f1cc251e",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "W8rknwzDWP5Ve2tV",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "schedule",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Code5').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "reminder_time_10",
+              "fieldValue": "={{null}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        1216
+      ],
+      "id": "b0a14fcf-e536-4e6e-b531-c9b28db804aa",
+      "name": "Update a row1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "DAtZ8AUnO1FZkTwU",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "schedule",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Code3').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "reminder_time_30",
+              "fieldValue": "={{null}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        864
+      ],
+      "id": "3fbf6dc3-b6fb-4556-814e-e0f010959675",
+      "name": "Update a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "DAtZ8AUnO1FZkTwU",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "schedule",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Code7').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "reminder_time_exact",
+              "fieldValue": "={{null}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        1552
+      ],
+      "id": "2c20af25-92c3-4865-9b29-70bfe9cfadde",
+      "name": "Update a row2",
+      "credentials": {
+        "supabaseApi": {
+          "id": "DAtZ8AUnO1FZkTwU",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.first().json;\nconst output = [];\n\n// Current local time in HH:mm:ss (24-hour)\nconst now = new Date();\nconst timez = now.toTimeString().slice(0, 8); \nconsole.log(\"Current time:\", timez);\n\nif (inputData && Array.isArray(inputData.chatmemory)) {\n  inputData.chatmemory.forEach(entry => {\n    if (entry.reminder_time_exact) {\n      const [remH, remM] = entry.reminder_time_exact.split(\":\").map(Number);\n      const reminderMinutes = remH * 60 + remM;\n\n      const [nowH, nowM] = timez.split(\":\").map(Number);\n      const nowMinutes = nowH * 60 + nowM;\n\n      // Check within ±1 min\n      entry.isReminderNow = Math.abs(reminderMinutes - nowMinutes) <= 1;\n    } else {\n      entry.isReminderNow = false;\n    }\n\n    output.push({ json: entry });\n  });\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        1552
+      ],
+      "id": "ecaa1be9-c08c-4e2b-8534-2760fc3f2929",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        640
+      ],
+      "id": "e47d31c5-83af-43a3-9fa4-8438afd688a0",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"summary\": \"user_{{$json[\"recipiant\"].replace(/\\n/g, \"\")}}_events\",\n  \"timeZone\": \"Asia/Kolkata\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        32,
+        -128
+      ],
+      "id": "3239bc08-968b-4155-a529-053e3a0b158e",
+      "name": "HTTP Request2",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "WWrd4L36kL85KaQ2",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3311adf0-d99b-4870-9478-4287c2d0d741",
+              "leftValue": "={{ $json.reminder_time_30 }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "20d602ba-5056-4a31-8c9f-a49799ccb530",
+              "leftValue": "={{ $json.reminder_time_10 }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b9329540-3687-4cfd-bbcb-74139e5e5c43",
+              "leftValue": "={{ $json.reminder_time_exact }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1472,
+        864
+      ],
+      "id": "0a00e2de-e228-4e7d-8370-16445109df57",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3311adf0-d99b-4870-9478-4287c2d0d741",
+              "leftValue": "={{ $json.reminder_time_30 }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "20d602ba-5056-4a31-8c9f-a49799ccb530",
+              "leftValue": "={{ $json.reminder_time_10 }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b9329540-3687-4cfd-bbcb-74139e5e5c43",
+              "leftValue": "={{ $json.reminder_time_exact }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1504,
+        1216
+      ],
+      "id": "02d418f7-1917-4ec8-b636-589853910edb",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3311adf0-d99b-4870-9478-4287c2d0d741",
+              "leftValue": "={{ $json.reminder_time_30 }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "20d602ba-5056-4a31-8c9f-a49799ccb530",
+              "leftValue": "={{ $json.reminder_time_10 }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b9329540-3687-4cfd-bbcb-74139e5e5c43",
+              "leftValue": "={{ $json.reminder_time_exact }}",
+              "rightValue": "={{ null }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        1552
+      ],
+      "id": "dc373f95-9a97-4850-8362-074d3ab67adf",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "schedule",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Update a row').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        848
+      ],
+      "id": "2895348f-bb18-440c-a6b1-cf12e414212a",
+      "name": "Delete a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "DAtZ8AUnO1FZkTwU",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "schedule",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Update a row').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        1200
+      ],
+      "id": "bba00c9f-fadd-44b9-b483-6226c5602162",
+      "name": "Delete a row1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "DAtZ8AUnO1FZkTwU",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "schedule",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        1536
+      ],
+      "id": "e8a343aa-d764-4d41-b99a-754302171704",
+      "name": "Delete a row2",
+      "credentials": {
+        "supabaseApi": {
+          "id": "DAtZ8AUnO1FZkTwU",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cal.com/v2/bookings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer cal_live_14d96376e00dd780fc64fd02f9b6133e"
+            },
+            {
+              "name": "cal-api-version",
+              "value": "2024-08-13"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"attendee\": {\n    \"name\": \"WhatsApp User\",\n    \"timeZone\": \"Asia/Kolkata\",\n    \"email\": \"gfhkhihhi@gmail.com\",\n    \"phoneNumber\": \"+919305371779\"\n  },\n  \"start\": \"2025-11-18T13:45:00+05:30\",\n  \"eventTypeSlug\": \"15min\",\n  \"username\": \"rishi-gupta-m5jqys\",\n  \"metadata\": {\n    \"source\": \"dinner\",\n    \"supabase_row_id\": \"51\",\n    \"original_message\": \"set a reminder at 2:15pm today\",\n    \"notes\": \"r at 2:15pm today\",\n    \"description\": \"dinner\"\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -736,
+        976
+      ],
+      "id": "7a6fd07d-3fd4-4768-80d6-a23ba581b39c",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cal.com/v2/bookings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer cal_live_14d96376e00dd780fc64fd02f9b6133e"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "cal-api-version",
+              "value": "2024-08-13"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"attendee\": {\n    \"language\": \"en\",\n    \"name\": \"{{ $json.body.attendee_name }}\",\n    \"timeZone\": \"{{ $json.body.attendee_timezone }}\",\n    \"email\": \"{{ $json.body.attendee_email }}\",\n    \"phoneNumber\": \"{{ $json.body.attendee_phone }}\"\n  },\n  \"start\": \"{{ $json.body.start }}\",\n  \"eventTypeId\": {{ $json.body.eventTypeId }},\n  \"bookingFieldsResponses\": {\n    \"phone\": \"{{ $json.body.attendee_phone }}\",\n    \"company\": \"{{ $json.body.attendee_company }}\",\n    \"notes\": \"{{ $json.body.notes }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "ab5947b4-d33c-4908-8f15-ed050a736918",
+      "name": "Create booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -1312,
+        752
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Authorization\": \"Bearer {{ $json.access_token }}\",\n  \"Content-Type\": \"application/json\"\n}\n",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"summary\": \"Static Test Event\",\n  \"description\": \"This is a test event using a static access token\",\n  \"start\": {\n    \"dateTime\": \"2025-09-05T10:00:00+05:30\",\n    \"timeZone\": \"Asia/Kolkata\"\n  },\n  \"end\": {\n    \"dateTime\": \"2025-09-05T11:00:00+05:30\",\n    \"timeZone\": \"Asia/Kolkata\"\n  },\n  \"attendees\": [\n    { \"email\": \"gfhkhihhi@gmail.com\" }\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1088,
+        976
+      ],
+      "id": "89e492a9-367f-4bce-8d08-ee6ce0ef23bc",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "client_id",
+              "value": ""
+            },
+            {
+              "name": "client_secret",
+              "value": ""
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            },
+            {
+              "name": "refresh_token",
+              "value": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1232,
+        960
+      ],
+      "id": "d4e0e980-7633-41b3-b7de-37ab9c12359c",
+      "name": "HTTP Request3"
+    }
+  ],
+  "pinData": {
+    "WhatsApp Trigger1": [
+      {
+        "json": {
+          "messaging_product": "whatsapp",
+          "metadata": {
+            "display_phone_number": "15551906658",
+            "phone_number_id": "808191762370093"
+          },
+          "contacts": [
+            {
+              "profile": {
+                "name": "Rishi"
+              },
+              "wa_id": "919305371779"
+            }
+          ],
+          "messages": [
+            {
+              "from": "919305371779",
+              "id": "wamid.HBgMOTE5MzA1MzcxNzc5FQIAEhggMzA4MDk4RDVCRTY3MThCQTc0N0Q5RDkxRjg4QzgwQUQA",
+              "timestamp": "1756479418",
+              "text": {
+                "body": "Meeting at 9pm today"
+              },
+              "type": "text"
+            }
+          ],
+          "field": "messages"
+        }
+      }
+    ],
+    "Create booking": [
+      {
+        "json": {
+          "code": 1,
+          "name": "First item"
+        }
+      }
+    ],
+    "HTTP Request3": [
+      {
+        "json": {
+          "access_token": "",
+          "expires_in": 3599,
+          "scope": "https://www.googleapis.com/auth/calendar",
+          "token_type": "Bearer",
+          "refresh_token_expires_in": 169011
+        }
+      }
+    ],
+    "HTTP Request1": [
+      {
+        "json": {
+          "kind": "calendar#event",
+          "etag": "\"3513967776685150\"",
+          "id": "08ltqlpqrn7uljja5jikptbjcg",
+          "status": "confirmed",
+          "htmlLink": "https://www.google.com/calendar/event?eid=MDhsdHFscHFybjd1bGpqYTVqaWtwdGJqY2cgYnJhbWhhc3RyYWFpQG0",
+          "created": "2025-09-04T11:04:48.000Z",
+          "updated": "2025-09-04T11:04:48.342Z",
+          "summary": "Static Test Event",
+          "description": "This is a test event using a static access token",
+          "creator": {
+            "email": "bramhastraai@gmail.com",
+            "self": true
+          },
+          "organizer": {
+            "email": "bramhastraai@gmail.com",
+            "self": true
+          },
+          "start": {
+            "dateTime": "2025-09-05T04:30:00Z",
+            "timeZone": "Asia/Kolkata"
+          },
+          "end": {
+            "dateTime": "2025-09-05T05:30:00Z",
+            "timeZone": "Asia/Kolkata"
+          },
+          "iCalUID": "08ltqlpqrn7uljja5jikptbjcg@google.com",
+          "sequence": 0,
+          "attendees": [
+            {
+              "email": "gfhkhihhi@gmail.com",
+              "responseStatus": "needsAction"
+            }
+          ],
+          "reminders": {
+            "useDefault": true
+          },
+          "eventType": "default"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many rows1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows1": {
+      "main": [
+        [
+          {
+            "node": "Filter1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get many rows2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send message4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row in Supabase1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows2": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Send message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent3",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent3": {
+      "main": [
+        [
+          {
+            "node": "Send message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Code8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code3": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate2": {
+      "main": [
+        [
+          {
+            "node": "Code4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code4": {
+      "main": [
+        [
+          {
+            "node": "Code5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate3": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code7": {
+      "main": [
+        [
+          {
+            "node": "AI Agent3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code5": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code8": {
+      "main": [
+        [
+          {
+            "node": "Code3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aggregate2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aggregate3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message": {
+      "main": [
+        [
+          {
+            "node": "Update a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message1": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message3": {
+      "main": [
+        [
+          {
+            "node": "Update a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Code7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message4": {
+      "main": [
+        []
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row2": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Delete a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Delete a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Delete a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Indian/Maldives",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "b0f7f753-87fc-46ef-bd29-d49f38248915",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36d9ae84a72d08531f0efdc8013b1e8d0435664f3bb9efa747948048236d8051"
+  },
+  "id": "IZ5EONPhL4GDtj1I",
+  "tags": []
+}
